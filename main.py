@@ -72,8 +72,9 @@ def predict(data: KeypointsInput):
     kp = preprocess_keypoints(data.keypoints).to(DEVICE)
 
     # RUN MODEL
-    ids = model.generate(kp)  # or model.generate(kp) depending on your model
+    ids = model.generate(kp, stoi)  # or model.generate(kp) depending on your model
     gloss = ids_to_gloss(ids)
 
     return {"gloss": gloss}
+
 
