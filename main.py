@@ -8,28 +8,29 @@ from model import Sign2Gloss
 # -----------------------------
 # SAFE PREPROCESS FUNCTION
 # -----------------------------
-def preprocess_keypoints(kps, target_dim=99, max_frames=128):
+def preprocess_keypoints(kps, max_frames=128):
     import numpy as np
     import torch
 
     arr = np.array(kps, dtype=np.float32)
-    T, D = arr.shape
 
-    # Fix feature dimension
-    if D < target_dim:
-        arr = np.pad(arr, ((0,0),(0,target_dim-D)), mode='constant')
-    elif D > target_dim:
-        arr = arr[:, :target_dim]
+    # TRAINING PIPELINE: reshape from (T,33,3) → (T,99)
+    if arr.ndim == 3:
+        T, K, C = arr.shape
+        arr = arr.reshape(T, K * C)   # (T, 99)
+    else:
+        T = arr.shape[0]              # already (T,99)
 
-    # Fix frame count
-    if T < max_frames:
-        pad = np.zeros((max_frames - T, target_dim), dtype=np.float32)
-        arr = np.concatenate([arr, pad], axis=0)
-    elif T > max_frames:
+    # TRAINING PIPELINE: pad or truncate to 128 frames
+    if T > max_frames:
         idx = np.linspace(0, T - 1, max_frames).astype(int)
         arr = arr[idx]
+    elif T < max_frames:
+        pad = np.zeros((max_frames - T, 99), dtype=np.float32)
+        arr = np.concatenate([arr, pad], axis=0)
 
-    return torch.tensor(arr).unsqueeze(0)  # (1,128,99)
+    return torch.tensor(arr, dtype=torch.float32).unsqueeze(0)  # (1,128,99)
+
 
 # -----------------------------
 # LOAD VOCAB
@@ -71,7 +72,8 @@ def predict(data: KeypointsInput):
     kp = preprocess_keypoints(data.keypoints).to(DEVICE)
 
     # RUN MODEL
-    ids = model.generate(kp, stoi)  # or model.generate(kp) depending on your model
+    ids = model.generate(kp)  # or model.generate(kp) depending on your model
     gloss = ids_to_gloss(ids)
 
     return {"gloss": gloss}
+
